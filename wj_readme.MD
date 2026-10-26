@@ -804,3 +804,147 @@ int machine_endianness_type(){
         return 1; //little endianness
 }
 ```
+
+# Section 14: TLV Based Communication
+
+## 77 TLV Introduction
+- TLV: Type Length Value
+- common scenario in Networking that machines often exchange messages with one another.
+    - Interior Gateway protocol such as OSPF exchange their Link state packets with other routers in the network for their proper functioning.
+```
+struct xmsg{
+    uint loopback_ip;
+    char router_name[32];
+    uint if_addr1;
+    uint if_addr2;
+    uint link1_bw;
+    uint link2_bw;
+}
+```
+```
+struct xmsg* recv_msg = (struct xmsg*)buffer;
+recv_msg->loopback_ip...
+```
+- Problem in exchange of messages arises due to heterogeneity of communicating machines.
+    - different manufacturing vendors
+    - using different hardware and technologies
+    - using different c compilers, language, software
+    - ...
+- cannot ask all vendors around world to manufacture their network equipment using identical technologies and hardware.
+- 2 scenarios:
+    - when machines are distinct and incompatible.
+    - when selective machines in network are upgraded.
+
+## 78 Why we need TLVs?
+- Scenario 1: when machines are distinct and incompatible.
+- uint in 32-bit system is 4Bytes but in 64-bit system is 8Bytes.
+- machine will typecast the msg according to its belief of definition of xmsg
+- 2 problems (reading garbage data due to different belief of different system/ mismatch of data type):
+    - read wrong type length
+    - read wrong offset of subsequent data
+    - data corruption
+
+## 79 Why we need TLVs - Another scenario
+- Scenario 2: when selective machines in network are upgraded.
+    - add new member in struct
+    ```
+    struct xmsg{
+        uint loopback_ip;
+        char router_name[32];
+        uint if_addr1;
+        uint if_addr2;
+        //newly added members
+        char if_mac1[6];
+        char if_mac2[6];
+        uint link1_bw;
+        uint link2_bw;
+    }
+    ```
+    - different machine has different interfaces
+    - data corruption again
+- networking is a field where various network equipments being manufactured by various vendors need to work in complete cooperation and harmony with each other for the network protocol to work.
+- machine need to comply with each other for the network functionality to work correctly, yet at the same time network vendors should be free to innovate/ upgrade/ update their software without breaking the existing compliance with the other machines deployed in the network.
+- Concept of TLVs solves these problems very easily.
+
+## 80 Understanding TLVs
+- TLV stands for Type Length Value
+- it is a mechanism to encode the data in the format that is independent of:
+    - machine archittecture
+    - underlying OS
+    - compiler
+    - programming language
+- TLVs 3 components:
+    - TLV type (T): 1 Byte. 0 - 255
+        - unique identifier. definition
+        - machines communicating must know the TLV definition.
+    - Data Length (L): 1 Byte
+        - length of Actual Data
+    - Actual Data (V): Data Length Byte
+- eg TLV type 132
+```
+//TLV type 132 (total 5 Bytes)
+4 Byte integer number
+1 Byte mask value
+```
+```cpp
+132 //TLV type 132 (5 bytes)
+20 //20 Bytes of data => 20/5 = 4 occurence
+201392385 => 10.10.1.30
+24
+201392386 => 10.10.1.31
+25
+201392387 => 10.10.1.32
+28
+201392388 => 10.10.1.33
+30
+```
+- Many network protocols use this concept of TLV to exchange message among machines.
+
+## 81 TLV Addressing the problem of Heterogeneity
+- Scenario of 3 machines (32-bit, 32-bit, 16-bit)
+- void decode_tlv_132(char* tlv_ptr) is platform architecture independent as it did not use uint/ int to copy data.
+- uint/ int is platform dependent. 2Bytes in 16bit machine, 4Bytes in 32bit machine
+- it uses memcpy(), char which is machine-agnostic
+- default section of code for machine that does not support TLV 132. Skip the content by incrementing the ptr to end of message.
+```
+//wrong as unsigned int is 2Byte in 16b machine, 4Byte in 32b machine
+struct tlv132{
+    unsigned int ip_address;
+    char mask;
+}
+```
+```
+//correct as char is 1Byte in 16b and 32b machine
+struct tlv132{
+    char ip_address[4];
+    char mask;
+}
+```
+- TLVs are all about send and read data byte by byte, and every machine must know TLV type definition (optional, skip if dont know).
+
+## 82 TLV Addressing the problem of Software Upgrade
+- Upgraded machine know new TLV type 222 which is just 6Bytes of data => mac address.
+- non-upgraded machine will just skip TLV type 222 if it does not know. Cannot take part in new functionality but no data corruption.
+
+## 83 Data Structure - STREAMS
+- Streams (aka serialize-buffer):
+    - data structure to create (serialize) and read (de-serialize) TLVs.
+    - work like a type-writer
+    ```cpp
+    typedef struct serialized_buffer{
+        char *b; //pt to start of buffer
+        int size; //size of entire buffer
+        int next; //size of data in buffer. point to end of buffer so that new data will go here. Increment after copying data to the buffer. next is offset from start of buffer.
+    } ser_buff_t;
+    ```
+    - API
+        - init_serialized_buffer(ser_buff_t **b);
+        - void serialize_data(ser_buff_t *buff, char* data, int nbytes); //copy data from ... to serialized buffer.
+    - if there is no space to accommodate new data, double the size of entire buffer while preserving the existing content.
+        - use realloc
+
+## 84 TLV De-Serialization using STREAMS
+- serialize buffer same as TLV
+- de-serializing the TLV
+- API:
+    - void de_serialize_data(char* dest, ser_buf_t* b, int size); //read from serialized_buffer to dest (local variable).
