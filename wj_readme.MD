@@ -948,3 +948,128 @@ struct tlv132{
 - de-serializing the TLV
 - API:
     - void de_serialize_data(char* dest, ser_buf_t* b, int size); //read from serialized_buffer to dest (local variable).
+
+# Section 15: Working with Linux Posix Timers
+
+## 85 Agenda and Prerequisites
+- Posix timer is specific to Linux.
+- https://github.com/sachinites/WheelTimer/tree/master/WheelTimer/libtimer
+- Action on timer:
+    - create
+    - update
+    - delete
+    - restart
+    - pause
+    - resume
+    - reschedule
+- type of timer:
+    - periodic
+    - one shot
+    - exponential back off
+- Timer-base Algo and state machine
+- Build own custom timer library (more controllable)
+- Prerequisite:
+    - Linux OS
+    - Callback/ function pointer
+    - C programming skills
+- This section is conceptual. Meaning u can learn the concept and implement it in other language.
+
+## 86 Timer Relevance
+- Why we need timer:
+    - schedule future event
+    - schedule periodic event
+    - use case:
+        - TCP timers
+        - OTP time out
+        - Session log out
+        - Periodic send out network packet
+        - deferring/ scheduling the computation
+
+## 87 Timer Types
+- 3 types:
+    - one shot timer
+        - trigger only once after certain time
+    - periodic timer
+        - trigger periodically
+    - exponential back off timer
+        - trigger at exponentially placed temporal points
+        - eg. 1s, 2s, 4s, 8s, etc.
+        - used in protocol such as TCP
+
+## 88 Posix APIs for Timers
+- 4 basic API
+    - timer_create(): create but dont fire
+    - timer_settime(): start or stop timer based on argument
+    - timer_gettime(): return remaining time for timer to fire.
+    - timer_delete(): delete the timer data structure.
+- use these API to build our custom timer library
+- Terminologies:
+    - start or alarm the timer
+    - timer fires or timer expires
+
+## 89 Timer Design
+- How timer works
+    - in the context of separate code flow (thread or process)
+    - require function pointer (aka timer callback), function argument.
+    - timer function blocks until expiration time when it will trigger the function
+    - different timer behaviour:
+        - one shot timer: Process kills thread created for the timer
+        - periodic timer: Process restart thread for the timer
+        - exponential back off timer: Process restart thread for the timer, use another time
+
+## 90 Timer Creation Steps
+- int timer_create(<type of timer>, <timer controlling parameters>, <timer pointer>);
+    - return 0 on success, -1 on error, and errno (errno.h) is set to errcode.
+        - errno can be print using %d if return -1
+    - 1st argument: can set to use real timer (CLOCK_REALTIME)
+    - 2nd argument: struct sigevent evp; //to set 3 variables:
+        - evp.sigev_notify_function = ptr to callback function
+            - prototype of callback function. Generic wrapper over application callback
+            ```cpp
+            void timer_callback(union sigval arg){
+                arg.sival_ptr; //adress of argument
+            }
+            ```
+        - evp.sigev_value.sival_ptr = address of argument to callback function
+        - evp.sigev_notify = SIGEV_THREAD /* ask kernel to launch a timer thread to invoke callback */
+            - can be other way instead of thread.
+    - 3rd argument: address of timer object.
+- need a way to specify expiration time of timer.
+```c
+struct itimerspec ts;
+```
+```c
+struct itimerspec{
+    struct timespec it_interval; //next value
+    struct timespec it_value; //current value
+}
+```
+```c
+struct timespec{
+    time_t tv_sec; //sec
+    long tv_nsec; //nanosec
+}
+```
+- to set expiration time of 5s, use 
+```c
+ts.it_value.tv_sec=5;
+ts.it_value.tv_nsec=0;
+```
+- after setting the expiration, need to arm/ start the timer
+```c
+int timer_settime(<timer>, 0, &ts, NULL);
+```
+
+## 91 TImer Implementation and Demo
+- https://github.com/sachinites/WheelTimer/tree/master/WheelTimer/libtimer/Course/timerExampleDemo1.c
+- to work with posix timer, need the following header files:
+    - signal.h
+    - time.h
+- gcc -g -c Course/timerExampleDemo1.c -o Course/timerExampleDemo1.o
+- gcc -g Course/timerExampleDemo1.o -o Course/timerExampleDemo1.exe -lrt
+    -lrt: posix realtime library
+- itimerspec.it_value: is to set the first timer value.
+- itimerspec.it_interval: is to set the subsequent timer value.
+    - set to 0 to make it one shot timer
+    - set it to same as it_value to make it periodic.
+    - set it to different value as it_value to make first firing different timing, but subsequent firing is periodic.
