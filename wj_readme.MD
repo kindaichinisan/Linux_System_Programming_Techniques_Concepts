@@ -1073,3 +1073,88 @@ int timer_settime(<timer>, 0, &ts, NULL);
     - set to 0 to make it one shot timer
     - set it to same as it_value to make it periodic.
     - set it to different value as it_value to make first firing different timing, but subsequent firing is periodic.
+
+Section 16: Memory Layout of Linux Process
+
+## 92 Agenda
+Memory Management in Linux:
+- Stack memory
+    - Procedure call
+    - Procedure return
+- Heap memory
+    - malloc
+    - free (deallocate memory)
+- Paging, Demand paging are out of scope. Look for pure OS course.
+
+## 93 Virtual Memory Memory Basics
+- Pre-requisite
+    - virtual address space: memory assigned to a process
+    - virtual memory: total amount of memory your system has for a process
+        - different from physical memory
+        - conceptual, not actual (like physical memory, RAM chip. Has upper limit based on computer architecture)
+        - computer architecture dependent (cannot change for a computer)
+            -32bit system: 2^32 Bytes (4GB)/ process
+                - Byte-addressable: Every Byte has an address
+                - 2^32 Virtual addresses in a 32bit system
+        - computer program works with virtual memory. Program access only virtual address. Program never knows anything about physical memory.
+
+    - memory layout of process
+
+## 94 Memory Layout of Linux
+- diagrammatic representation of the process' memory layout
+- understands how process' virtual memory works during process execution.
+- Windows is not open source, therefore we cannot explain how virtual memory works
+- memory diagram (High Address on top, Low Address below. Stack on top grows downwards, Heap at bottom grows upwards.)
+- Below Heap is bss (uninitialized data), Initialized data, then code.
+- Memory layout of Process (from LA to HA):
+    - Code: Memory which stores the compiled process assembly code in text format.
+        - Fixed. Cannot define more.
+    - Initialized data: memory which stores the process initialized global and static variable (local function)
+        - Fixed. Cannot define more.
+    - Uninitialized data (bss): memory which stores the process uninitialized global and static variables. 
+        -bss: Block Started by Symbol
+        - Fixed. Cannot define more
+    - Heap: Dynamic memory assigned to a process.
+        - total system available memory. The heap region expands or shrinks when process malloc or free memory.
+        - grow from LA to HA
+    - Stack: memory assigned for process execution.
+        - cannot grow beyond a certain limit
+        - contains
+            - all local variables
+            - argument passed in function
+            - return address
+            - caller info
+        - support procedure call and return
+        - grow from HA to LA
+    - cmd line argument
+        - int argc
+        - char** argv[]
+
+## 95 Example: Memory Layout of Linux Process
+```c
+int global_var=10; //initialized data segment
+int global_var2; //uninitialized data segment. Initialize the value to 0
+
+int main(int argc, char** argv){ //stack memory segment
+    int i=0; //stack memory segment
+    char* my_name="Abhishek"; //stack memory segment
+    static int j=5; //initialized data segment
+    int* k; //stack memory segment
+    k=malloc(100); //heap memory segment
+    foo(j); //stack memory segment
+    return 0;
+}
+
+//compiled machine code is stored in code segment (read-only)
+```
+- Virtual Address Space = Code + Data + Heap + Stack + Command-line Argument
+- If unallocated memory is attempted to be accessed, it will result in segmentation fault.
+- new stack frame = new function
+- data segment is split into 2 parts: Initialized data segment and Uninitialized data (bss) segment.
+
+## 96 Exercise on size command
+- size program_name command in Linux:
+    - shows 3 segment size:
+        - text
+        - data
+        - bss
