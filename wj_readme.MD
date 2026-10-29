@@ -1158,3 +1158,116 @@ int main(int argc, char** argv){ //stack memory segment
         - text
         - data
         - bss
+
+# Section 17: Stack Memory Management
+
+## 97 Stack Memory Basics
+- What is stack memory: region of memory in process virtual address space where data is added or removed LIFO
+    - Every function ha a stack frame.
+        - setting up stack frame is joint effort of caller and callee.
+            - caller: eg. main
+            - callee: function inside main()
+            - must be set up on stack memory first b4 function can execute
+    - Every process has its own fixed configurable stack memory
+- What is the purpose
+- How it is organized by OS
+
+## 98 Stack Memory Contents
+```c
+void foo(int a, int b){
+    int k=10;
+    ...
+    ready();
+}
+void bar(int c){
+    statement1;
+    statement2;
+    foo(4,5);
+    statement3
+}
+```
+- stack frame contains 4 types of information:
+    - parameter passed to the callee
+    - return address of the caller function (4B)
+    - base pointer (4B)
+- bar() call foo(4, 5)
+    - stack frame of foo()
+        - parameters of foo()
+            - b=5
+            - a=4
+        - return address of bar: statement3
+        - base pointer. aka frame pointer. ebp
+        - local variables of foo()
+            - k=10
+        - stack frame of ready()
+- stack pointer points to the top of the stack. esp
+- max stack size limit: stack cannot grow beyond it will have segmentation fault.
+
+## 99 Stack-Overflow and Prevention
+- situation where program stack grows beyond the maximum stack fixed size
+    - caused by long chain of function calls or recursive functions
+        - discouraged to write recursive function in industry
+- see stack memory max size on machine: ulimit -s (in MB)
+- Prevention:
+    - dont write recursive function
+    - dont use large local array in function
+
+## 100 Stack Memory Corruption
+- situation where we corrupt the stack data by copying the data more than the memory limits.
+```c
+void foo(char* bar){
+    char c[12];
+    strcpy(c, bar); //no bounds checking
+}
+int main(){
+    foo("ILOVEMYCOUNTRYBRAZIL")
+}
+```
+![Image description](images/100_1.png)
+- Only has 12 Bytes but copy 20 Bytes. Corrupt the base pointer and return address.
+- stack corruption: undefined behaviour
+
+## 101 Procedure Call and Return - Getting Started
+- 3 goals:
+    - when caller makes a call to callee, callee should start execute from beginning
+    - when callee finishes or returns, caller resumes from the point where it left
+    - return value by callee, if any, should be available to caller.
+- call stack: collection of stack frames, each function when called in program create a new frame in stack.
+- a frame that is currently being executed is always the topmost frame of stack (LA)
+- pointer to start of top most frame = frame pointer aka base pointer.
+- pointer to end of top most frame = stack pointer
+    - push: increment stack pointer (move toward LA)
+    - pop: decrement stack pointer (move toward HA)
+- program counter is pointer which always points to the current instruction to be executed. aka instruction pointer. Some architecture say PC points to the next instruction. Minor difference.
+- procedure call: caller calling callee, control transfers to callee.
+- procedure return: callee terminates and control return back to caller.
+
+## 102 Common Cpu Registers
+- eip: instruction pointer register. stores the address of very next or current instruction to be executed.
+- esp: stack pointer register. stores the address of top of stack (LA)
+- ebp: base pointer register. stores the starting address in callee's stack frame where caller's base pointer value is copied (record's history)
+- these registers are per cpu, not per frame.
+
+## 103 Procedure Call Mechanism
+
+## 104 Purpose of Base Pointer register (ebp)
+## 105 Formalizing Procedure Call Algorithm
+## 106 Procedure Return - Goals
+## 107 Procedure Return Explained - Step by Step
+## 108 Formalizing Procedure Return Algorithm
+
+# Section 18 Heap Memory Management
+
+## 109 Heap Memory Management - Goals and Introduction
+
+## 110 Malloc() - Quick Revision
+## 111 Break pointer
+## 112 brk and sbrk system calls
+## 113 Malloc Version 1.0
+## 114 Problem Statement
+## 115 Heap Memory Management Requirement
+## 116 MetaBlock and DataBlock
+## 117 Allocations and Deallocations
+## 118 Block Splitting
+## 119 Block Merging
+## 120 Problem of Fragmentation
