@@ -1249,13 +1249,81 @@ int main(){
 - these registers are per cpu, not per frame.
 
 ## 103 Procedure Call Mechanism
+- f1() call f2() which call f3()
+- how eip, ebp and esp changes
+    - eip keeps changing as instruction are being executed.
+        - 4B (32b system) or 8B (64b system)
+    - esp keeps incrementing to LA as data is pushed to stack
+    - ebp
+        - 4B (32b system) or 8B (64b system)
+- stack frame of f1()
+    - arg2 of f1
+    - arg1 of f1
+    - return addr of f0 which call f1
+    - ebp of f0 -> ebp=84
+    - local var2 of f1
+    - local var1 of f1
+- f1 call f2
+    - push arg2, arg1 of f1 (reverse order) into stack
+    - push return address of f1 into stack (1 instruction line after calling f2)
+    - push ebp (base pointer of f1) into stack
+    - push local var of f2 into stack
+        - esp = top of stack frame f2
+    - When caller calls callee, current value of eip and ebp are saved in callee stack frame as return addr and base ptr value of caller (historical data/ caller frame info). This info helps caller to resume execution when callee returns.
+    - ebp and eip registers are updated as per the callee's stack frame.
 
 ## 104 Purpose of Base Pointer register (ebp)
-## 105 Formalizing Procedure Call Algorithm
-## 106 Procedure Return - Goals
-## 107 Procedure Return Explained - Step by Step
-## 108 Formalizing Procedure Return Algorithm
+- ebp register is used as reference to access all local variables and local argument of stack frame
+    - ebp + 12: callee local argument2
+    - ebp + 8: callee local argument1
+    - ebp + 4: caller return address
+    - ebp + 0: caller base pointer. address where caller's base pointer address is saved in callee's stack frame
+    - ebp - 4: callee local variable2
+    - ebp - 8: callee local variable1
+- for stack frame to execute its instruction, ebp value must be set.
+- when callee returns, caller must restore the value of ebp.
 
+## 105 Formalizing Procedure Call Algorithm
+- caller push the argument list of callee in reverse order.
+- caller push the address of next instruction of caller as return address in callee's stack frame.
+- callee push prev frame base pointer and copy esp to ebp
+- callee set EIP/ PC to the next instruction in callee to be executed.
+- callee push the local variables of callee
+- callee can now excecute.
+- with every push, esp is decremented (move toward LA)
+- with every pop, esp is incremented (move toward HA)
+
+## 106 Procedure Return - Goals
+- continue from 103. fn1 call fn2 which call fn3
+- when fn3 returns, ebp=36, eip=last instr address of fn3, esp=28
+- stack frame of fn3 popped out of stack
+- ebp=60, eip=0x2004, esp=52
+
+## 107 Procedure Return Explained - Step by Step
+- stack frame of f3()
+    - 1. pop out all local variables.
+        - esp increment (move towards HA)
+        - value below esp are freed
+    - 2. copy caller's base address into ebp register
+        - mv %ebp %esp (ebp <- esp)
+        - pop: esp increment (move towards HA)
+    - 3. restore caller's last instruction address into eip register
+        - mv %eip %esp (eip <- esp)
+        - pop: esp increment (move towards HA)
+    - 4. pop all function argument
+        - esp increment (move towards HA)
+    - stack frame 3 is completely destroyed
+    - stack frame 2 is restored and resume its execution as normal
+- stack frame of f2()
+
+## 108 Formalizing Procedure Return Algorithm
+- callee function returns, following steps
+    - callee set the return value of callee in eax register
+    - callee increase stack ptr (esp) by size of all local variables of stack frame (107_1)
+    - callee restore %ebp to point to caller stack frame and pop previous frame base pointer from stack (107_2)
+    - callee set %eip to return address saved in callee stack and pop the saved return address from stack (give control back to calling function) (107_3)
+    - caller pop all argument it had passed onto the stack (107_4)
+    - caller reads the value stored in eax register and resume execution from %eip + 1 (next instruction)
 # Section 18 Heap Memory Management
 
 ## 109 Heap Memory Management - Goals and Introduction
