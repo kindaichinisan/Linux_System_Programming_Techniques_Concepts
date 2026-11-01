@@ -1462,3 +1462,193 @@ void* malloc(int size){
 - 2 types of fragmentation:
     - internal: unusable because of block splitting. creating small memory block smaller than metablock size (12B)
     - external: unusable because non-contiguous
+
+# Section 19: Concepts of Paging
+
+## 121 Introduction
+- Paging benefits:
+    - on 32-bit system with 4GB RAM size, create illusion of 4GB/ process whereas actual fact is 4GB for all processes.
+    - allow process to store data in non-contiguous address in PA
+    - allow multiple processes to re-use same physical memory address to store data, one process at a time.
+- paging is implemented by MMU (Memory Management Unit)
+
+## 122 Byte Addressable Memory
+- a memory in which every byte has an address.
+- virtual and physical memory are byte addressable memory.
+- byte is the lowest unit of memory that can be accessed.
+    - to access memory at BIT level, need to perform boolean operation.
+- 4GB => 2^32 Bytes
+    - if byte-addressable => 2^32 memory address
+
+## 123 What is 32 bit or 64 bit system
+- 32b system:
+    - all processes in execution have theoretically 2^32 virtual addresses in its process VAS    
+        - printf("address of var a=%p\n", &a): print virtual address of a
+    - size of data bus is 32bits
+    - size of address bus is 32bits
+
+## 124 Bus system
+- bus = collection of hard metal wires on PCB board connecting devices, transfer data from one device to other by means of voltage level (High voltage=1, Low voltage=0).
+    - device: CPU, RAM, HDD, USB port, etc.
+
+## 125 CPU generates Virtual Addresses
+- variable in program are symbolic names of addresses. Human-readable format for convenience.
+    - program translated into machine code
+    - variables translated into virtual addresses
+- all local variables and arguments of a function are accessed by CPU by adding or subtracting from base pointer register ebp of current stack frame
+    - cpu generate many logical/virtual address during process execution
+    - virtual address are mapped to physical address by MMU using paging.
+
+## 126 Data bus and Address Bus
+- cpu can read 4 Bytes of data (32b data bus) in 1 clock cycle for 32b system.
+- cpu can read 8 Bytes of data (64b data bus) in 1 clock cycle for 64b system.
+- useless to install more than 4GB RAM on 32-b system. Therefore, need 64-b system
+
+## 127 Mapping of Virtual Address to Physical Address
+- virtual memory is a concept. It is not a real memory. It does not contain any data.
+- data is written to physical memory only.
+- MMU translates VA to PA.
+- analogy:
+    - key: virtual address
+    - MMU: which key opens which locker
+    - locker: physical address
+
+## 128 Physical Pages and Frames
+- frame: divide physical address into block of equal size
+    - frame size: 4kB (4096B) on most system arch
+- 4GB physical memory has 2^32/2^12 - 2^20 frames.
+    - only 2^20 frames on RAM
+    - rest stored on HDD.
+- physical page: snapshot of data stored in a frame of physical memory.
+    - frame size = page size
+    - frame (physical) is container of page (logical)
+
+## 129 Page Swapping
+- swap is operation in which main memory save page in one of its frame to secondary storage and reload other page from secondary storage into the frame.
+- when Main memory do not have free frame,
+    - save Page P3 in frame F1 to secondary storage
+    - swap with Page P5 in secondary storage
+- swap algorithm:
+    - LRU (Least Recently Used)
+    - FIFO (Fast In Fast Out)
+
+## 130 Virtual Memory Pages
+- Similiar to Main memory (frame), Virtual memory is divided into page of same size (4096B: 12 bit).
+    - 12 bits are required to uniquely assign an address to a Byte within a page.
+- Pages are called Virtual pages (0 to 2^20-1).
+
+## 131 1:1 Mapping between Physical and Virtual Page
+- virtual page=collection of 4096 key
+    - 1 virtual address=1 key
+- physical page=collection of 4096 locker
+    - 1 physical address=1 locker
+- Process virtual pages: always contiguous
+- Process physical pages: may be non-contiguous in Main memory. Or may be stored in HDD
+- Physical pages are created or destroyed as process uses or frees corresponding virtual pages during process execution.
+    - malloc(10) may not result in creation of new physical/ virtual page if topmost virtual page in heap segment has 10 spare bytes to satisfy malloc request.
+
+## 132 Virtual Address Composition
+- virtual address (32-bit) can be split into 2 parts:
+    - 20 bits: virtual page #
+    - 12 bits: byte # within a page.
+- eg. virtual address: 0xffff0d00:
+    - page #: 1048560
+    - offset: 3328
+
+## 133 Page Table
+- page table: data structure maintained by OS for every running process
+    - used to map virtual address of process VAS to PA of RAM.
+    - 3 columns:
+        - virtual page #
+        - physical page # (normally = virtual page #, in complex scenario !=)
+        - frame # (RAM division)
+    - # rows = # pages in process VAS
+- page table size = # entries in page table * size of one entry
+- # entries in page table = # virtual page = virtual address size/page size
+- size of one entry = # bits to represent a physical memory frame = RAM size/ frame size
+
+## 134 Paging in Action
+- how mmu generate physical address from virtual address (generate by cpu)
+    - virtual address can be split into 2 parts:
+        - virtual page #
+            - use to find the frame # in RAM
+        - offset byte
+            - virtual address offset = physical address offset
+- page table is usually maintained as arrays since they have fixed size. Access can be O(1).
+
+## 135 Multiple Process Scenario
+- physical memory frame are shared between processes running on system.
+- physical page need not be contiguous in physical memory.
+- any free frame in RAM can be allocated to process' physical page, depending on page replacement algo.
+
+## 136 Resolve External Fragmentation
+- why frame size chosen to be = physical page size?
+    - physical page size must be <= frame size
+    - if physical page size < frame size, external fragmentation (wasted). To eliminate external fragmentation, physical page size = frame size
+
+## 137 Page Allocation to a Process - Part1
+- OS allocates/ free memory for a process in unit of page_size (4096B).
+    - when process calls malloc(12), OS allocate new page to process
+        - first 12 + Meta Block Size is allocated.
+        - rest is cached by glibc malloc implementation
+        - when process requests new memory via malloc, 
+            - if current page has enough space, current page will be used. OS is not requested to act.
+            - else, OS will allocate new page via sbrk()
+
+## 138 Page Allocation to a Process - Part2
+- 3 parties:
+    - Process: request memory via malloc
+    - glibc implementation: playing efficient game. Minimize # system call to OS. Require to switch from user mode to kernel mode.
+    - OS: allocate entire physical page frame to process
+
+## 139 Shared Physical Pages
+- shared physical page: physical page which is shared by >=2 running processes. Inside page tables of >=2 processes.
+- Inter-Process Communication via Shared Memory
+- Virtual Page of multiple processes maps to same Physical Page => Shared Physical Page.
+- Linux OS provide system call (mmap()) whereby multiple process can create a shared memory region to exchange data.
+
+## 140 Page tables Problems
+- Problems of page table and paging
+    - Page table size matters
+    - contiguous main memory allocation
+    - page table hollowness for small processes
+- Solution is to use multi-level paging
+
+## 141 Page Table Problem 1 - Large Page Table Size Matters
+- scenario 1
+    - 32bit system
+    - main memory size 4GB
+    - page size=4kB=2^12B
+    - page table entry=4B
+    - Virtual Address Space=2^32
+        - # virtual page = 2^32/2^12 = 2^20
+        - page table size = 2^20 * 4 = 2^22 = 4 MB
+    - if average, 100 processes => 400MB used out of 4GB. Ok
+- scenario 2
+    - 64bit system
+    - main memory size 8GB
+    - page size=4kB=2^12B
+    - page table entry=4B
+    - Virtual Address Space=2^64
+        - # virtual page = 2^64/2^12 = 2^52
+        - page table size = 2^52 * 4 = 2^54 = 2^34 MB. This is very big and not feasible.
+- problem of page table size grows as virtual address size supported by system increases.
+- 32bit system cannot access RAM beyond 4GB, hence we have 64bit system so that we can access more RAM.
+    - however, this will need a page table that is of giant size.
+
+## 142 Page Table Problem 2 - Need for Contiguous Main Memory
+- page table like physcial page are not fragmented and need contiguous region in RAM.
+- if page table size increases drastically (Problem 1), finding contiguous region in RAM is harder. More rare.
+- Multi-level paging is to break large page table into smaller size and load the smaller page table in non-contiguous frames in main memory.
+- multi-level paging = paging of page table.
+
+## 143 Page Table Problem 3 - Page Table Hollowness
+- esp for small processes (not memory intensive)
+- as soon as process runs, OS creates its page table and load in RAM, regardless of if process has malloc any memory.
+- for simple hello world program, have 2^32-1 virtual pages but only 6 are used.
+    - bottom 4 for code, initialized data and uninitialized dat (bss) segment
+    - upper 2 for cmd line argument and stack
+        - large holes exists. unused.
+    - not much stack and heap memory used for simple program.
+    - 2^32 - 6 pages not used. >=99% of page table is wasted. RAM wasted.
+- soln: multi-level paging
