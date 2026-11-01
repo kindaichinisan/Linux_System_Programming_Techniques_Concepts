@@ -1327,15 +1327,138 @@ int main(){
 # Section 18 Heap Memory Management
 
 ## 109 Heap Memory Management - Goals and Introduction
+- in Linux
+- how malloc() and free() works
+- internal fragmentation of heap memory.
+- problem of fragmentation and solution
+- system call related to heap memory management
+- technical interview questions
+- Heap memory of process: continuous part of Virtual Address Space of process from which a process claims and reclaims Memory during runtime (Dynamic Memory Allocation)
+    - unlike stack memory (reclaimed back upon procedure return automatically), it is programmer's responsibility to free the dynamic memory after use.
+- glibc API to harness functionality of Heap:
+- malloc, calloc, free, realloc
+    - malloc/calloc: used to allocate a memory block from heap segment of process
+    - free: used to release the memory back to heap segment which was claimed by malloc/calloc
+- system calls: brk, sbrk
 
 ## 110 Malloc() - Quick Revision
+- malloc: std c library function
+- only allocate non-reserved or free space
+- realloc provide resizing and freeing.
+- malloc returns starting address of allocated memory in heap segment of VAS.
+- MMU translates VA to PA (paging)
+    - for every VA, there is a PA (in RAM)
+    - Actual data is written on physical memory. Virtual memory do not contain any data.
+
 ## 111 Break pointer
+- break is pointer maintained by OS per process.
+- it points to top of heap memory segment.
+- any memory above break pointer is not a valid memory to be used by process.
+- esp is to stack memory, break pointer is to heap memory.
+
 ## 112 brk and sbrk system calls
+- system call provided by Linux OS:
+    - int brk(const void *addr);
+        - brk() expands the heap memory segment such that break moves towards higher memory address and points to the addr which is provided as argument. addr should be valid address.
+        - assign heap until.
+        - return 0 on success and -1 on failure.
+        - eg. int rc=brk(0xffff0d0);
+    - void *sbrk(intptr_t incr);
+        - sbrk() expands the heap memory segment such that break moves towards higher memory by incr bytes which is provided as argument.
+        - return old break pointer on success and NULL on failure.
+        - eg. void *ptr=sbrk(10);
+
 ## 113 Malloc Version 1.0
+- malloc/calloc
+    - function provided by standard c lib:
+    - not system call
+    - they are wrapper over sbrk() system call.
+        - they internally call sbrk() to claim memory from heap segment.
+        - the returned break pointer address is what is returned by malloc/calloc.
+        - eg simple wrapper implementation of malloc
+        ```c
+        void *xmalloc(int size){
+            void* p;
+            p=sbrk(0);
+
+            if(sbrk(size)==NULL){
+                return NULL;
+            }
+            return p;
+        }
+        ```
+        ```c
+        xfree(int nbytes){ //diff from free(void* ptr)
+            assert(nbytes>0);
+            sbrk(nbytes*-1);
+        }
+        ```
+
 ## 114 Problem Statement
+- how OS know how much memory to free on invoking free(p3);
+- how OS organizes the memory blocks assigned by malloc?
+- how OS ensures that p3 is valid memory address and memory pointed by p3 is occupied and is not freed already?
+    - all these require understanding concept of memory block management
+
 ## 115 Heap Memory Management Requirement
+- requirements
+    - process should be able to allocate small chunks of memory as requested from heap segment
+    - process should be able to return back those small chunks of memory it had requested back to heap segment, in any order
+    - not allowed to use any supporting data structures as data structure would in turn need separate memory (chicken-and-egg problem)
+
 ## 116 MetaBlock and DataBlock
+- metablock
+    - b4 datablock
+    - store meta information
+    ```c
+    struct meta_block_t{ //12Bytes
+        int size;
+        struct meta_block_t* next;
+        bool is_free;
+    }
+- datablock
+```c
+void* malloc(int size){
+    struct meta_block_t *p;
+    p=(struct meta_block_t *)sbrk(0);
+
+    if(sbrk(size+sizeof(meta_block_t))==NULL){
+        return NULL;
+    }
+    p->size=size;
+    p->next=NULL;
+    p->is_free=FALSE;
+    return p+1;
+}
+```
+- note that OS inserts additional padding bytes at end to make total block size integer multiple of 4. This is called 4B alignment.
+    - metablock (12B)
+    - datablock (14B)
+    - alignment bytes (2B)
+
 ## 117 Allocations and Deallocations
+- memory allocation
+    - next field of metablock to point to start of next metablock.
+- memory deallocation
+    - free makes use of metablock to check if it is free and to free it.
+
 ## 118 Block Splitting
+- 30Bytes free memory between 2 occupied memory
+    - malloc(10);
+        - 10B occupied
+        - 12B metadata of free memory
+        - 8B free memory
+- if malloc small memory
+    - using 12B metablock to manage small memory (inefficient)
+
 ## 119 Block Merging
+- block merging
+    - all consecutive free blocks must be merged together to form a bigger free block.
+    - remove metablock as datablocks are combined.
+    - prevent unnecessary expansion of heap memory segment
+
 ## 120 Problem of Fragmentation
+- problem of memory fragmentation: despites having enough free memory already (2* non-contiguous memory segment), we still need to extend the heap region further to satisfy new memory request.
+- 2 types of fragmentation:
+    - internal: unusable because of block splitting. creating small memory block smaller than metablock size (12B)
+    - external: unusable because non-contiguous
