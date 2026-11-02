@@ -1652,3 +1652,80 @@ void* malloc(int size){
     - not much stack and heap memory used for simple program.
     - 2^32 - 6 pages not used. >=99% of page table is wasted. RAM wasted.
 - soln: multi-level paging
+
+# Section 20: Multi Level Paging
+
+## 144 Introduction
+- Problem of page table:
+    - Larger size of page table
+    - Need for contiguous main memory
+    - Hollow region of page tables
+- end goal of page table: Given a virtual address, locate the physical frame, then the exact physical address in Main Memory.
+- Multi level paging: like multi-level indexing of Table of Content of a book
+    - Section 1, Unit 3, Chapter 5, Topic 6, Page 5: topic of interest
+    - page table: section, unit, chapter, topic, page
+    - RAM frame #: topic of interest
+- Main idea of multi-level paging: break the large page tables into smaller one and fit each individual smaller page table at dispersed location in RAM.
+    - PAGE_SIZE = Main memory logical fragmentation size
+    - choose PAGE_SIZE as optimal size into which page table is fragmented.
+    - allow the fragmented page table to fully occupy the entire frame of RAM.
+    - take shape of tree-like structure.
+
+## 145 Multi Level Paging In Action - Part1
+- Configuration
+    - Virtual Address Size: 8bit
+        - virtual address space size = 2^8
+        - virtual address composition = 6 (which page table) + 2 (offset)
+            - 6:
+                - 2 (1st level)
+                - 2 (2nd level)
+                - 2 (3rd level)
+    - Main Memory: 64B = 2^6
+        - # phyiscal page: 64/4 = 16
+        - Physical address size = 6 bits
+    - PAGE_SIZE: 4B
+        - frame size = 4B = 2^2
+        - # of bits for offset = 2
+        - page table size = page_size = 4B
+        - #entries in page table = 4/1 = 4
+            - #bits to index into single page table = 2
+    - Page table entry = 1B
+    - map 8bit VA to 6bit PA
+- frame
+    -f0: 3rd level page table
+    -f1: 2nd level page table
+    -f2: 2nd level page table
+    -f3: 3rd level page table
+    -f4: physical page
+    -f5: 3rd level page table
+    -f6: 2nd level page table
+    -f7
+    -f8
+    -f9
+    -f10: 1st level page table
+    -f11
+    -f12
+    -f13
+    -f14
+    -f15
+- page table of page table column:
+    - index
+    - physical address
+        - some are NULL: there is no page table corresponding to this index
+- page table of frame column (final level of page table):
+    - index
+    - frame #
+
+## 146 Multi Level Paging In Action - Part2
+| Properties | Single Level Paging Scheme | Multi Level Paging Scheme |
+|---|---|---|
+| Page table size | PT entry size * # virtual pages of process | Frame size |
+| PT size (example) | 1B * 2^8/4 = 64B | Frame size = 4B |
+| # page tables per process | 1 | 4^2 + 4^1 + 4^0 = 21 |
+| Memory references to map VA->PA | 1 | 3 (slow) |
+| page table content | Most is empty (hollow) | Create/ Delete page tables on demand |
+- 4^2 + 4^1 + 4^0: 3 level of page table, each page table has 4 entries.
+- Memory references to map VA->PA: How many lookup required
+- Paging on demand:
+    - 0100XXXX: 01 -> 00 -> NULL: no need page table
+    - 001XXXXX: 00 -> 10 and 11 -> NULL: no need page table
