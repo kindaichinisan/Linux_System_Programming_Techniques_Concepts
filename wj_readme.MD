@@ -1729,3 +1729,45 @@ void* malloc(int size){
 - Paging on demand:
     - 0100XXXX: 01 -> 00 -> NULL: no need page table
     - 001XXXXX: 00 -> 10 and 11 -> NULL: no need page table
+
+# Section 21: Paging on demand
+
+## 147 Problem Statement
+- Demand paging
+    - # main memory frame = RAM size/ page size
+    - max # physical page = RAM size/ page size (1 process can occupy the full RAM)
+    - if 1 process occupy the full RAM, there is no multi-tasking.
+    - OS also needs Main memory to run. => 1 process cannot occupy the full RAM. => soln: demand paging
+    - concept: keep only required physical page of process in main memory (scarce resource), rest of the page can be swapped out to disk.
+- Benefit of demand paging:
+    - increase multi-tasking
+    - less main memory is consumed per process.
+    - can support more users
+- To implement, need to add additinal column Valid/Invalid to page table
+    - indicate if physical page is present in RAM frame (1) or in HDD (0)
+
+## 148 Demand Paging Steps
+- page fault: when page table dictates that a physical page is not present in a frame, a special signal is raised to CPU called trap, aka page fault.
+- demand paging scheme + page fault
+- configuration
+    - VAS (Virtual Address Space) = 16B = 2^4
+        - Virtual address = 4bits = 2 (page) + 2 (offset)
+    - Page size = 4B = 2^2 (indicate offset)
+    - Main Memory (RAM) = 32B = 2^6
+- Step
+    - CPU generates Virtual Address (9)
+    - Frame lookup in page table
+        - If valid bit is 0 (physical page is not present in RAM but in HDD)
+    - MMU raise page fault to CPU
+    - CPU locate physical page on Disk
+    - Page fault service: CPU loads physical page from Disk to RAM (which frame to load to RAM is decided based on Page Replacement Algorithm)
+        - Current frame data is swapped out to HDD (if current frame has phyiscal page on it)
+        - new physical page data is swapped in
+    - Update page table of new physical page Frame # and Valid bit set to 1
+        - update page table of the swapped out page invalid bit set to 0.
+## 149 Effective Access Time
+- Performance of system under demand paging
+    - page fault increase memory access time by CPU (due to need to access HDD)
+    - p: probability of page fault
+    - Effective Access Time (EAT) = (1-p)* memory_access_time + p* time_to_service_page_fault
+    - time_to_service_page_fault = page fault overhead + swap page out + swap page in + restart overhead
