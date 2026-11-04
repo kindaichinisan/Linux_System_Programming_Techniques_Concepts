@@ -1771,3 +1771,42 @@ void* malloc(int size){
     - p: probability of page fault
     - Effective Access Time (EAT) = (1-p)* memory_access_time + p* time_to_service_page_fault
     - time_to_service_page_fault = page fault overhead + swap page out + swap page in + restart overhead
+
+# Section 22: Memory Management for Multi-threaded Processes
+
+# 150 Introduction
+- focus on multi-threaded processes
+- thread shares everything with each other and parent process, except the stack memory
+    - code segment
+    - data segment (initialized and uninitialized)
+    - open file descriptors (sockets, msg_queue, etc.)
+    - heap memory
+- only thing not shared is stack memory
+- Each thread has its own execution flow, hence they need to have separate stack memory (responsible for program execution: procedure call and return).
+- thread is called lightweight process as they share many things, Kernel dont have to work too hard to create and destroy threads.
+- let see how VAS changes and how page tables are setup when it creates a new thread.
+
+# 151 Virtual Memory Management
+- memory snapshot b4 thread creation
+- exclusive memory access to particular thread stack memory for the new thread created
+- thread can access the original memory (code, data, heap)
+- change to VAS:
+    - creation of thread stack memory (exclusive to that thread)
+
+# 152 Page Table Management
+![Image description](images/152_1.png)
+
+- when create new thread, how does page table change?
+    - new thread share the VAS of parent process, access the same page table.
+    - if thread modifies shared memory, changes will be visible by other thread of parent process.
+    - virtual page belonging to new thread's stack memory are created. Corresponding physical pages are created and loaded in main memory frame. new VP -> PP mapping.
+
+# 153 Thread Termination
+![Image description](images/153_1.png)
+
+![Image description](images/153_2.png)
+
+- thread terminates execution
+    - virtual pages corresponding to thread's stack memory are freed.
+    - physical pages corresponding to thread's stack memory are freed.
+    - page table entries corresponding to virtual pages freed above are updated as empty in page table
